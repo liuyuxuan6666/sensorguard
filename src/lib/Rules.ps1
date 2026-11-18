@@ -12,6 +12,42 @@ function Test-NameMatch {
     return ($Name -like $Pattern)
 }
 
+function Resolve-Precondition {
+    <#
+        Resolves a rule's optional precondition ("when").
+        A precondition is matched on the SAME hardware as the main sensor, so multi-GPU
+        hosts evaluate "GPU idle" per card instead of mixing them up.
+        Returns $null when no sensor matches (the rule then simply cannot fire).
+    #>
+    param(
+        [Parameter(Mandatory)]$When,
+        [Parameter(Mandatory)][AllowEmptyCollection()][object[]]$Sensors,
+        [Parameter(Mandatory)][string]$HardwareName
+    )
+    $hw = if ($When.hardwareType) { $When.hardwareType } else { '*' }
+    $type = if ($When.sensorType) { $When.sensorType } else { '*' }
+    $name = if ($When.sensor) { $When.sensor } else { '*' }
+
+    $sameHw = $Sensors | Where-Object {
+        (Test-NameMatch $_.HardwareType $hw) -and
+        (Test-NameMatch $_.SensorType $type) -and
+        (Test-NameMatch $_.Sensor $name) -and
+        ($_.Hardware -eq $HardwareName)
+    } | Select-Object -First 1
+
+    if (-not $sameHw) { return $null }
+
+    return [pscustomobject]@{
+        Hardware  = $sameHw.Hardware
+        Sensor    = $sameHw.Sensor
+        Value     = [double]$sameHw.Value
+        Unit      = $sameHw.Unit
+        Op        = $When.op
+        Threshold = [double]$When.threshold
+        Met       = Test-Threshold -Value $sameHw.Value -Op $When.op -Threshold ([double]$When.threshold)
+    }
+}
+
 function Get-RuleInstances {
     <#
         Resolves a rule against a sensor snapshot.
@@ -78,6 +114,16 @@ function Get-RuleInstances {
                 Value        = [double]$s.Value
                 Unit         = $s.Unit
             })
+        }
+    }
+
+    # Resolve the optional precondition for every matched instance, e.g.
+    # "CPU above 65 C while total load is below 15%" - the idle-temperature signature
+    # of failing cooling, which absolute thresholds miss entirely.
+    if ($Rule.when) {
+        foreach ($inst in $instances) {
+            $pre = Resolve-Precondition -When $Rule.when -Sensors $Sensors -HardwareName $inst.Hardware
+            $inst | Add-Member -NotePropertyName Precondition -NotePropertyValue $pre -Force
         }
     }
 
@@ -150,6 +196,11 @@ function Invoke-RuleEvaluation {
             $st.Unit = $inst.Unit
 
             $cond = Test-Threshold -Value $inst.Value -Op $rule.op -Threshold ([double]$rule.threshold)
+            # A precondition must hold for the rule to be armed at all: when it stops
+            # holding (load came back up), the timer resets exactly like a recovered value.
+            $pre = $null
+            if ($inst.PSObject.Properties['Precondition']) { $pre = $inst.Precondition }
+            if ($null -ne $pre -and -not $pre.Met) { $cond = $false }
             $forSec = if ($null -ne $rule.forSeconds) { [int]$rule.forSeconds } else { 0 }
             $repeatSec = if ($null -ne $rule.repeatSeconds) { [int]$rule.repeatSeconds } else { $DefaultRepeatSeconds }
             if ($repeatSec -lt 180) { $repeatSec = 180 }   # hard floor: protect against Feishu 429
@@ -176,6 +227,7 @@ function Invoke-RuleEvaluation {
                             Op           = $rule.op
                             Threshold    = [double]$rule.threshold
                             HeldSeconds  = [math]::Round($heldFor, 0)
+                            Precondition = $pre
                             At           = $Now
                         })
                     }
@@ -199,6 +251,7 @@ function Invoke-RuleEvaluation {
                         Op           = $rule.op
                         Threshold    = [double]$rule.threshold
                         HeldSeconds  = [math]::Round(($Now - $st.PendingSince).TotalSeconds, 0)
+                        Precondition = $pre
                         At           = $Now
                     })
                 }

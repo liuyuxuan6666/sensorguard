@@ -25,7 +25,8 @@
     "labelThreshold": "阈值",
     "labelProcess": "占用最高进程",
     "labelNew": "首次触发",
-    "labelRepeat": "仍在持续"
+    "labelRepeat": "仍在持续",
+    "labelWhen": "前提"
   },
   "rules": [
     {
@@ -38,6 +39,24 @@
       "threshold": 92,
       "forSeconds": 120,
       "severity": "critical"
+    },
+    {
+      "id": "cpu-idle-temp",
+      "enabled": true,
+      "hardwareType": "Cpu",
+      "sensorType": "Temperature",
+      "sensor": "CPU Package",
+      "op": ">",
+      "threshold": 65,
+      "forSeconds": 600,
+      "severity": "warning",
+      "when": {
+        "hardwareType": "Cpu",
+        "sensorType": "Load",
+        "sensor": "CPU Total",
+        "op": "<",
+        "threshold": 20
+      }
     },
     {
       "id": "cpu-load-sustained",
@@ -107,6 +126,24 @@
       "threshold": 95,
       "forSeconds": 900,
       "severity": "warning"
+    },
+    {
+      "id": "gpu-idle-temp",
+      "enabled": true,
+      "hardwareType": "Gpu*",
+      "sensorType": "Temperature",
+      "sensor": "GPU Core",
+      "op": ">",
+      "threshold": 70,
+      "forSeconds": 600,
+      "severity": "warning",
+      "when": {
+        "hardwareType": "Gpu*",
+        "sensorType": "Load",
+        "sensor": "GPU Core",
+        "op": "<",
+        "threshold": 15
+      }
     },
     {
       "id": "mem-pressure",

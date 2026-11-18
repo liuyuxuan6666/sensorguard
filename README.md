@@ -27,6 +27,7 @@ LibreHardwareMonitorLib  ──►  规则状态机  ──►  飞书自定义�
 - **持续判定**：`forSeconds` 内持续越界才告警，瞬时抖动不会吵你
 - **告警要有归因**：卡片里附 top-N CPU 占用进程（PID + 百分比）
 - **散热劣化早期信号**：内置 `GPU Hot Spot − GPU Core` 温差规则（大于 25 °C 通常意味着散热接触不良）
+- **空闲高温检测**：负载已经降下来、温度却还居高不下——这是硅脂老化、风扇停转、风道堵塞最早的表现，绝对温度阈值完全抓不到
 - **不刷屏**：同一轮多条规则同时触发会合并成一张卡片；同一条告警重复通知的间隔有 3 分钟硬下限，另有全局发送节流与 429 退避
 - **恢复通知**：指标回落会发一条绿色的"已恢复"，不会让你永远猜现在好没好
 - **日志齐全但不画图**：每天一个 JSONL 目录，采样和事件分开，随时 `grep` / `jq`
@@ -124,6 +125,27 @@ powershell -ExecutionPolicy Bypass -File .\scripts\install-task.ps1 -StartNow
 ```
 
 一条规则如果同时匹配多块硬件（比如两块 GPU），每块硬件独立计时、独立告警。
+
+### 复合条件（`when`）
+
+前置条件只在它成立时，主条件才会被评估：
+
+```json
+{
+  "id": "cpu-idle-temp",
+  "hardwareType": "Cpu", "sensorType": "Temperature", "sensor": "CPU Package",
+  "op": ">", "threshold": 65, "forSeconds": 600, "severity": "warning",
+  "when": { "hardwareType": "Cpu", "sensorType": "Load", "sensor": "CPU Total", "op": "<", "threshold": 20 }
+}
+```
+
+含义：**CPU 负载低于 20% 的前提下，Package 温度持续 10 分钟高于 65 °C 才告警**。
+
+- 前置条件在**同一块硬件**上求值，多显卡主机逐卡判断，不会把 A 卡的负载套到 B 卡上
+- 前置条件失效等同指标恢复：计时清零，`FIRING` 中的告警会收到恢复通知
+- 找不到前置传感器时该规则不触发（宁可不报，也不误报）
+
+> **门槛要按你机器的空闲基线设。** 这台机器 CPU Total 基线约 15–30%、AMD 卡空闲负载 8–10%，所以默认用的是 20% 和 15%。纯做服务器、负载更低的机器可以收紧，跑着容器的机器则需要放宽。先跑 `-DumpSensors` 观察几天基线再定。
 
 ## 告警语义
 

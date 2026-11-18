@@ -129,6 +129,7 @@ function New-AlertCard {
     $labelProcess = if ($Messages.labelProcess) { $Messages.labelProcess } else { 'top process' }
     $labelNew = if ($Messages.labelNew) { $Messages.labelNew } else { 'new' }
     $labelRepeat = if ($Messages.labelRepeat) { $Messages.labelRepeat } else { 'still firing' }
+    $labelWhen = if ($Messages.labelWhen) { $Messages.labelWhen } else { 'when' }
 
     $severity = 'warning'
     foreach ($it in $Items) {
@@ -157,6 +158,13 @@ function New-AlertCard {
             $thr = Format-MetricValue -Value $it.Threshold -Unit $it.Unit
             $state = if ($it.IsNew) { $labelNew } else { $labelRepeat }
             $detail = "$labelThreshold $($it.Op) $thr | $labelDuration $([int]$it.HeldSeconds)s | $state"
+            $pre = $null
+            if ($it.PSObject.Properties['Precondition']) { $pre = $it.Precondition }
+            if ($null -ne $pre) {
+                $pv = Format-MetricValue -Value $pre.Value -Unit $pre.Unit
+                $pt = Format-MetricValue -Value $pre.Threshold -Unit $pre.Unit
+                $detail = $detail + "`n" + "$labelWhen $($pre.Sensor) $pv $($pre.Op) $pt"
+            }
         }
         else {
             $reason = if ($it.Reason -eq 'sensor-unavailable') { 'sensor unavailable' } else { 'back to normal' }
