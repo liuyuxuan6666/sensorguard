@@ -224,7 +224,7 @@ try {
             if (($now - $lastSampleLog).TotalSeconds -ge $sampleEvery) {
                 $lastSampleLog = $now
                 $slim = @($sensors | Where-Object {
-                        $_.SensorType -eq 'Temperature' -or
+                        ($_.SensorType -eq 'Temperature' -and $_.Sensor -notmatch '(?i)(warning|critical|limit|distance)') -or
                         ($_.SensorType -eq 'Load' -and $_.HardwareType -like 'Gpu*')
                     } | ForEach-Object {
                         [ordered]@{

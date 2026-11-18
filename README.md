@@ -34,17 +34,17 @@ LibreHardwareMonitorLib  ──►  规则状态机  ──►  飞书自定义�
 
 ## 实测情况
 
-在以下配置上验证（Windows 11 + Windows PowerShell 5.1）：
+在以下配置上验证（Windows 11 + Windows PowerShell 5.1，管理员权限 + PawnIO 驱动已安装）：
 
 | 硬件 | 传感器可读性 |
 |---|---|
-| Intel i5-12600KF（12 代，6P+4E） | 负载可读；**温度需管理员** |
-| NVIDIA RTX 4060 Ti | 核心温度、Hot Spot、负载、功耗、风扇，**非管理员可读** |
-| AMD RX 6600 XT | 核心温度、Hot Spot、负载、风扇，**非管理员可读** |
-| KIOXIA NVMe | **需管理员** |
-| Gigabyte Z790 D 主板 | SuperIO 风扇/温度需管理员，且取决于主板支持 |
+| Intel i5-12600KF（12 代，6P+4E） | 负载 + 温度（Package / Core Max / 各 P-Core 与 E-Core） |
+| NVIDIA RTX 4060 Ti | 核心温度、Hot Spot、负载、功耗、风扇 |
+| AMD RX 6600 XT | 核心温度、Hot Spot、负载、风扇 |
+| KIOXIA NVMe | Composite / 各传感器温度 |
+| Gigabyte Z790 D 主板 | SuperIO 风扇与温度（取决于主板支持） |
 
-共 100 个可读传感器（非管理员状态）。`-DumpSensors` 可以在你自己的机器上核对清单。
+共 255 个可读传感器。`-DumpSensors` 可以在你自己的机器上核对清单。
 
 ## 快速开始
 
@@ -52,6 +52,9 @@ LibreHardwareMonitorLib  ──►  规则状态机  ──►  飞书自定义�
 # 1. 准备 LibreHardwareMonitor 运行库（下载官方 release 到 .\vendor）
 powershell -ExecutionPolicy Bypass -File .\scripts\setup.ps1
 #    网络需要代理时：-Proxy http://127.0.0.1:7897
+
+# 1.5 安装 PawnIO 底层驱动（LHM 0.9.5+ 必需，否则读不到 CPU/主板温度）
+#     需要管理员权限：winget install --id namazso.PawnIO --exact
 
 # 2. 配置飞书机器人
 notepad .\config.json        # 填 feishu.webhook 和 feishu.secret
@@ -161,7 +164,25 @@ jq -c '.sensors[] | select(.hw|contains("NVIDIA"))' logs/2026-11-18/sample.jsonl
 
 ## 权限
 
-**必须以管理员运行**，否则 CPU 温度、主板 SuperIO、NVMe 温度全部读不到（LHM 需要加载内核驱动访问 MSR / IO 端口）。非管理员时程序不会假装读到 0，而是在启动自检里明确列出 `missing: cpu-temperature, storage-temperature`，并在日志中提示。
+**能不能读到温度，由两件事共同决定：**
+
+**1）管理员权限。** LHM 通过内核驱动访问 MSR / IO 端口，非管理员时这些读取全部失败。
+
+**2）PawnIO 驱动。** LibreHardwareMonitor 0.9.5 起用 [PawnIO](https://pawnio.eu/) 取代了 WinRing0（后者有提权漏洞），并把驱动从发行包里移了出去。**只装库不装驱动时，只有走厂商 API 的值能读**：GPU 走 NVML/DXGI、NVMe 走 SMART，而 CPU 温度和主板 SuperIO 全空。
+
+```powershell
+winget install --id namazso.PawnIO --exact    # 需要管理员
+```
+
+装好后服务状态应为 Running：
+
+```powershell
+Get-Service PawnIO
+```
+
+参考量级：同一台机器，装 PawnIO 前 118 个可读传感器、CPU 温度 0 个；装后 255 个传感器、CPU 温度 23 个。
+
+非管理员时程序不会假装读到 0，而是在启动自检里明确列出 `missing: cpu-temperature, storage-temperature`，并在日志中提示。
 
 `install-task.ps1` 默认注册为交互式登录账号的**最高权限**计划任务。若机器不自动登录，用 `-S4U` 注册为免登录运行（出站 webhook 仍可用）。
 

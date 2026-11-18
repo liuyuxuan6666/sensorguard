@@ -40,10 +40,16 @@ $arguments = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$en
 
 $action = New-ScheduledTaskAction -Execute $psExe -Argument $arguments -WorkingDirectory $root
 
-# At boot + every 5 minutes as a safety net: if the process dies the task restarts it.
-$triggers = @(
-    (New-ScheduledTaskTrigger -AtStartup)
-)
+# At boot AND at logon: an AtStartup trigger with an Interactive principal can fire
+# before the user session exists, in which case the task would be skipped. The AtLogon
+# trigger covers that race. MultipleInstances=IgnoreNew keeps it single.
+#
+# Note: build the array with += ; PowerShell's Object[] has no .ToArray() method.
+$triggers = @()
+$triggers += New-ScheduledTaskTrigger -AtStartup
+if (-not $S4U) {
+    $triggers += New-ScheduledTaskTrigger -AtLogOn -User "$env:USERDOMAIN\$env:USERNAME"
+}
 
 $settings = New-ScheduledTaskSettingsSet `
     -AllowStartIfOnBatteries `
@@ -57,6 +63,14 @@ $settings = New-ScheduledTaskSettingsSet `
 $logonType = if ($S4U) { 'S4U' } else { 'Interactive' }
 $principal = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\$env:USERNAME" `
     -LogonType $logonType -RunLevel Highest
+
+# Replace an existing registration cleanly: a running instance holds the task and can
+# make Register-ScheduledTask -Force fail.
+$existing = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+if ($existing) {
+    Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 2
+}
 
 Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $triggers `
     -Settings $settings -Principal $principal -Force | Out-Null

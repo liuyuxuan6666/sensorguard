@@ -33,7 +33,7 @@
       "enabled": true,
       "hardwareType": "Cpu",
       "sensorType": "Temperature",
-      "sensor": "*",
+      "sensor": "CPU Package",
       "op": ">",
       "threshold": 92,
       "forSeconds": 120,

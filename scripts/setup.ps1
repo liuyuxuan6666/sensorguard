@@ -71,6 +71,21 @@ else {
     Write-Host 'config.json already exists, left untouched'
 }
 
+# LibreHardwareMonitor 0.9.5+ reads sensors through PawnIO instead of WinRing0. Without
+# the driver only vendor-API values (GPU via NVML/DXGI, NVMe via SMART) are readable;
+# CPU MSR and board SuperIO stay empty.
+$pawnio = Get-Service -Name 'PawnIO' -ErrorAction SilentlyContinue
+if ($pawnio -and $pawnio.Status -eq 'Running') {
+    Write-Host 'PawnIO driver: running' -ForegroundColor Green
+}
+else {
+    Write-Host ''
+    Write-Host 'WARNING: PawnIO driver is not installed/running.' -ForegroundColor Yellow
+    Write-Host '  Without it CPU package and motherboard temperatures read as empty.' -ForegroundColor Yellow
+    Write-Host '  Install it once, from an elevated shell:' -ForegroundColor Yellow
+    Write-Host '    winget install --id namazso.PawnIO --exact' -ForegroundColor Cyan
+}
+
 Write-Host ''
 Write-Host 'next steps:' -ForegroundColor Cyan
 Write-Host '  1. edit config.json (feishu webhook + secret)'

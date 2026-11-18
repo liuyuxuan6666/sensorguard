@@ -3,6 +3,8 @@ logs/
 config.json
 *.log
 _probe*
+_*.ps1
+_*.txt
 
 # LHM runtime payload (downloaded by scripts\setup.ps1)
 vendor/
