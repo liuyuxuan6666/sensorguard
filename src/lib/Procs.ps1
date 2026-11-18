@@ -16,14 +16,34 @@ function Get-TopProcesses {
     $now = Get-Date
 
     if ($null -eq $script:ProcPrevAt) {
-        $script:ProcPrevAt = $now
+        # First call has no delta to compute: seed the baseline and fall back to
+        # lifetime CPU time so a very first alert still carries some attribution.
+        $seed = New-Object System.Collections.ArrayList
         $script:ProcPrev = @{}
         foreach ($p in (Get-Process -ErrorAction SilentlyContinue)) {
             if ($null -ne $p.CPU) {
                 $script:ProcPrev[$p.Id] = [pscustomobject]@{ Cpu = [double]$p.CPU; Name = $p.ProcessName }
+                [void]$seed.Add([pscustomobject]@{
+                        Name         = $p.ProcessName
+                        Id           = $p.Id
+                        CpuSeconds   = [double]$p.CPU
+                        WorkingSetMB = [math]::Round($p.WorkingSet64 / 1MB, 0)
+                    })
             }
         }
-        return @()
+        $script:ProcPrevAt = $now
+        if ($seed.Count -eq 0) { return @() }
+
+        if ($Metric -eq 'memory') {
+            $top = $seed | Sort-Object -Property WorkingSetMB -Descending | Select-Object -First $Count
+            return @($top | ForEach-Object {
+                    '{0} (pid {1}) {2} MB' -f $_.Name, $_.Id, $_.WorkingSetMB
+                })
+        }
+        $top = $seed | Sort-Object -Property CpuSeconds -Descending | Select-Object -First $Count
+        return @($top | ForEach-Object {
+                '{0} (pid {1}) {2}s cpu-time (lifetime)' -f $_.Name, $_.Id, [math]::Round($_.CpuSeconds, 0)
+            })
     }
 
     $elapsed = ($now - $script:ProcPrevAt).TotalSeconds

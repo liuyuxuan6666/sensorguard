@@ -165,53 +165,60 @@ try {
 
             $paths = Get-LogPaths -Root $logRoot -Time $now
 
-            foreach ($f in $eval.Firings) {
-                $result = Send-AlertCard -Config $config -Items @($f) -Kind 'firing' `
+            if ($eval.Firings.Count -gt 0) {
+                # One card per round: a burst of simultaneously failing rules becomes a
+                # single webhook call instead of N calls, which keeps us far from the
+                # bot rate limit and reads better in the chat.
+                $result = Send-AlertCard -Config $config -Items $eval.Firings -Kind 'firing' `
                     -TopProcesses $top -DryRun:$DryRun
-                Write-JsonLine -Path $paths.Event -Object ([ordered]@{
-                        ts           = $now.ToString('o')
-                        type         = if ($f.IsNew) { 'firing-new' } else { 'firing-repeat' }
-                        ruleId       = $f.RuleId
-                        severity     = $f.Severity
-                        hardware     = $f.Hardware
-                        sensor       = $f.Sensor
-                        value        = [math]::Round($f.Value, 2)
-                        unit         = $f.Unit
-                        op           = $f.Op
-                        threshold    = $f.Threshold
-                        heldSeconds  = $f.HeldSeconds
-                        dryRun       = [bool]$DryRun
-                        notified     = [bool]$result.Ok
-                        attempts     = $result.Attempts
-                        error        = $result.Error
-                    })
-                if ($result.Ok) {
-                    Write-ConsoleLine ("ALERT {0}/{1} {2} = {3}{4} (>={5}s)" -f $f.Severity, $f.RuleId,
-                        $f.Hardware, ([math]::Round($f.Value, 1)), $f.Unit, [int]$f.HeldSeconds) 'ERROR'
-                }
-                else {
-                    Write-ConsoleLine ("notify failed for {0}: {1}" -f $f.RuleId, $result.Error) 'ERROR'
+                foreach ($f in $eval.Firings) {
+                    Write-JsonLine -Path $paths.Event -Object ([ordered]@{
+                            ts           = $now.ToString('o')
+                            type         = if ($f.IsNew) { 'firing-new' } else { 'firing-repeat' }
+                            ruleId       = $f.RuleId
+                            severity     = $f.Severity
+                            hardware     = $f.Hardware
+                            sensor       = $f.Sensor
+                            value        = [math]::Round($f.Value, 2)
+                            unit         = $f.Unit
+                            op           = $f.Op
+                            threshold    = $f.Threshold
+                            heldSeconds  = $f.HeldSeconds
+                            dryRun       = [bool]$DryRun
+                            notified     = [bool]$result.Ok
+                            attempts     = $result.Attempts
+                            error        = $result.Error
+                        })
+                    if ($result.Ok) {
+                        Write-ConsoleLine ("ALERT {0}/{1} {2} = {3}{4} (>={5}s)" -f $f.Severity, $f.RuleId,
+                            $f.Hardware, ([math]::Round($f.Value, 1)), $f.Unit, [int]$f.HeldSeconds) 'ERROR'
+                    }
+                    else {
+                        Write-ConsoleLine ("notify failed for {0}: {1}" -f $f.RuleId, $result.Error) 'ERROR'
+                    }
                 }
             }
 
-            foreach ($r in $eval.Recoveries) {
-                $result = Send-AlertCard -Config $config -Items @($r) -Kind 'recovery' -DryRun:$DryRun
-                Write-JsonLine -Path $paths.Event -Object ([ordered]@{
-                        ts        = $now.ToString('o')
-                        type      = 'recovery'
-                        ruleId    = $r.RuleId
-                        severity  = $r.Severity
-                        hardware  = $r.Hardware
-                        sensor    = $r.Sensor
-                        value     = if ($null -ne $r.Value) { [math]::Round($r.Value, 2) } else { $null }
-                        unit      = $r.Unit
-                        reason    = $r.Reason
-                        dryRun    = [bool]$DryRun
-                        notified  = [bool]$result.Ok
-                        attempts  = $result.Attempts
-                        error     = $result.Error
-                    })
-                Write-ConsoleLine ("RECOVERED {0} / {1}" -f $r.RuleId, $r.Hardware) 'OK'
+            if ($eval.Recoveries.Count -gt 0) {
+                $result = Send-AlertCard -Config $config -Items $eval.Recoveries -Kind 'recovery' -DryRun:$DryRun
+                foreach ($r in $eval.Recoveries) {
+                    Write-JsonLine -Path $paths.Event -Object ([ordered]@{
+                            ts        = $now.ToString('o')
+                            type      = 'recovery'
+                            ruleId    = $r.RuleId
+                            severity  = $r.Severity
+                            hardware  = $r.Hardware
+                            sensor    = $r.Sensor
+                            value     = if ($null -ne $r.Value) { [math]::Round($r.Value, 2) } else { $null }
+                            unit      = $r.Unit
+                            reason    = $r.Reason
+                            dryRun    = [bool]$DryRun
+                            notified  = [bool]$result.Ok
+                            attempts  = $result.Attempts
+                            error     = $result.Error
+                        })
+                    Write-ConsoleLine ("RECOVERED {0} / {1}" -f $r.RuleId, $r.Hardware) 'OK'
+                }
             }
 
             if (($now - $lastSampleLog).TotalSeconds -ge $sampleEvery) {
