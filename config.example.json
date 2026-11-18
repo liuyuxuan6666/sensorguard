@@ -1,0 +1,135 @@
+{
+  "intervalSeconds": 15,
+  "lhm": {
+    "dllPath": null
+  },
+  "feishu": {
+    "enabled": true,
+    "webhook": "https://open.feishu.cn/open-apis/bot/v2/hook/REPLACE_ME",
+    "secret": "REPLACE_ME",
+    "minRepeatSeconds": 180
+  },
+  "logging": {
+    "dir": "logs",
+    "keepDays": 14,
+    "sampleIntervalSeconds": 60
+  },
+  "attribution": {
+    "enabled": true,
+    "topN": 3
+  },
+  "messages": {
+    "titleFiring": "🔴 硬件告警",
+    "titleRecovery": "✅ 硬件恢复",
+    "labelDuration": "持续",
+    "labelThreshold": "阈值",
+    "labelProcess": "占用最高进程",
+    "labelNew": "首次触发",
+    "labelRepeat": "仍在持续"
+  },
+  "rules": [
+    {
+      "id": "cpu-temp-high",
+      "enabled": true,
+      "hardwareType": "Cpu",
+      "sensorType": "Temperature",
+      "sensor": "*",
+      "op": ">",
+      "threshold": 92,
+      "forSeconds": 120,
+      "severity": "critical"
+    },
+    {
+      "id": "cpu-load-sustained",
+      "enabled": true,
+      "hardwareType": "Cpu",
+      "sensorType": "Load",
+      "sensor": "CPU Total",
+      "op": ">",
+      "threshold": 90,
+      "forSeconds": 600,
+      "severity": "warning"
+    },
+    {
+      "id": "cpu-load-pinned",
+      "enabled": true,
+      "hardwareType": "Cpu",
+      "sensorType": "Load",
+      "sensor": "CPU Total",
+      "op": ">",
+      "threshold": 97,
+      "forSeconds": 1800,
+      "severity": "critical"
+    },
+    {
+      "id": "gpu-temp-warning",
+      "enabled": true,
+      "hardwareType": "Gpu*",
+      "sensorType": "Temperature",
+      "sensor": "GPU Core",
+      "op": ">",
+      "threshold": 82,
+      "forSeconds": 600,
+      "severity": "warning"
+    },
+    {
+      "id": "gpu-temp-critical",
+      "enabled": true,
+      "hardwareType": "Gpu*",
+      "sensorType": "Temperature",
+      "sensor": "GPU Core",
+      "op": ">",
+      "threshold": 88,
+      "forSeconds": 120,
+      "severity": "critical"
+    },
+    {
+      "id": "gpu-hotspot-delta",
+      "enabled": true,
+      "hardwareType": "Gpu*",
+      "sensorType": "Temperature",
+      "derive": {
+        "left": "GPU Hot Spot",
+        "right": "GPU Core"
+      },
+      "op": ">",
+      "threshold": 25,
+      "forSeconds": 300,
+      "severity": "warning"
+    },
+    {
+      "id": "gpu-load-sustained",
+      "enabled": true,
+      "hardwareType": "Gpu*",
+      "sensorType": "Load",
+      "sensor": "GPU Core",
+      "op": ">",
+      "threshold": 95,
+      "forSeconds": 900,
+      "severity": "warning"
+    },
+    {
+      "id": "mem-pressure",
+      "enabled": true,
+      "hardwareType": "Memory",
+      "hardware": "Total Memory",
+      "sensorType": "Load",
+      "sensor": "Memory",
+      "op": ">",
+      "threshold": 90,
+      "forSeconds": 300,
+      "severity": "warning"
+    },
+    {
+      "id": "nvme-temp",
+      "enabled": true,
+      "hardwareType": "Storage",
+      "sensorType": "Temperature",
+      "sensor": "*",
+      "op": ">",
+      "threshold": 70,
+      "forSeconds": 300,
+      "severity": "warning"
+    }
+  ]
+}

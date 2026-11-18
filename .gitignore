@@ -1,0 +1,13 @@
+# runtime data
+logs/
+config.json
+*.log
+_probe*
+
+# LHM runtime payload (downloaded by scripts\setup.ps1)
+vendor/
+
+# editor
+.vscode/
+.idea/
+*.swp
