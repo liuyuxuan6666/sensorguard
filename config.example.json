@@ -134,7 +134,7 @@
       "sensorType": "Temperature",
       "sensor": "GPU Core",
       "op": ">",
-      "threshold": 70,
+      "threshold": 75,
       "forSeconds": 600,
       "severity": "warning",
       "when": {

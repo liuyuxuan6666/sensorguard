@@ -223,9 +223,14 @@ try {
 
             if (($now - $lastSampleLog).TotalSeconds -ge $sampleEvery) {
                 $lastSampleLog = $now
+                # Sample log keeps only what later review needs: every temperature, plus
+                # the three load series that decide whether "idle" thresholds were met.
+                # Recording the D3D engine breakdown instead cost ~9 MB/day for no signal.
                 $slim = @($sensors | Where-Object {
                         ($_.SensorType -eq 'Temperature' -and $_.Sensor -notmatch '(?i)(warning|critical|limit|distance)') -or
-                        ($_.SensorType -eq 'Load' -and $_.HardwareType -like 'Gpu*')
+                        ($_.SensorType -eq 'Load' -and $_.HardwareType -like 'Gpu*' -and $_.Sensor -eq 'GPU Core') -or
+                        ($_.SensorType -eq 'Load' -and $_.HardwareType -eq 'Cpu' -and $_.Sensor -eq 'CPU Total') -or
+                        ($_.SensorType -eq 'Load' -and $_.HardwareType -eq 'Memory' -and $_.Sensor -eq 'Memory')
                     } | ForEach-Object {
                         [ordered]@{
                             hw    = $_.Hardware
